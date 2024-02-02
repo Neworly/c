@@ -1,0 +1,30 @@
+
+
+
+
+
+
+
+
+#ifndef PLAYER_H
+
+#include <inttypes.h>
+
+
+#endif
+
+struct Player {
+	uint64_t score;
+	uint8_t lives;
+} player;
+
+
+
+extern struct Player new() {
+	
+	player.lives = 3;
+
+	
+
+	return 
+}
