@@ -63,16 +63,17 @@ void relocate_player() {
 }
 
 struct Map new() {
-	graph_size = (rand() % (max_graph_size-5)) + 5;
+
+	graph_size = (rand() % (max_graph_size-(max_graph_size/2))) + ((max_graph_size/2));
 
 	struct Map grid = graph(graph_size);
 	struct Player* data = &player_data;
 
-	data->space.x = graph_size / 2;
-	data->space.y = graph_size / 2;
+	data->space.x = 0;
+	data->space.y = 0;
 
-	uint8_t tx = (rand() % (graph_size-2)) + 2;
-	uint8_t ty = (rand() % (graph_size-2)) + 2;
+	uint8_t tx = (rand() % (graph_size-(graph_size/2))) + (graph_size/2)-1;
+	uint8_t ty = (rand() % (graph_size-(graph_size/2))) + (graph_size/2)-1;
 	grid.value[ty][tx] = TARGET_SYMBOL;
 
 	update_player_position(&grid);
