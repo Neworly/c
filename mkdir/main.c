@@ -1,22 +1,3 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/stat.h>
@@ -61,40 +42,36 @@ void stdin_read() {
 }
 
 
+
+void make_folder(char* type, char* literal) {
+	strcat(type, literal);
+	mkdir(type, S_IFDIR);
+	strcat(type, "/");
+}
+
 int main(void) {
 	char* members[]  = { ".learning", ".projects", ".practice", nullptr };
 		
 	stdin_read();
 
-	char dependant[] = BASEPATH;
+	size_t standard_path_size = strlen(BASEPATH) + stdin_data.size;
+	char* type = malloc(standard_path_size);
 	
-
-	size_t base_size = strlen(dependant) + stdin_data.size;
-
-
-	char* type = malloc(base_size);
-	
-	strcat(type, BASEPATH);
-	strcat(type, stdin_data.mem);
-	mkdir(type, S_IFDIR);
-	strcat(type, "/");
+	strcpy(type, BASEPATH);
+	make_folder(type, stdin_data.mem);
 
 	size_t index = 0;
 
 	while (members[index]) {
-		char* pathname = malloc(base_size + strlen(members[index]));
+		char* pathname = malloc(standard_path_size+ strlen(members[index]));
 
-		strcat(pathname, type);
-		strcat(pathname, members[index]);
+		strcpy(pathname, type);
+		make_folder(pathname, members[index]);
 
-		mkdir(pathname, S_IFDIR);
-
+		free(pathname);
 
 		index++;
 	}
 
 	free(stdin_data.mem);
-}
-
-
-
+}	
