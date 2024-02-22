@@ -63,7 +63,7 @@ int main(void) {
 	size_t index = 0;
 
 	while (members[index]) {
-		char* pathname = malloc(standard_path_size+ strlen(members[index]));
+		char* pathname = malloc(standard_path_size + strlen(members[index]));
 
 		strcpy(pathname, type);
 		make_folder(pathname, members[index]);
