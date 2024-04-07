@@ -91,7 +91,13 @@ hash_push(HashTable* table, char* const key, void* value)
 void*
 hash_look(HashTable* table, char* const key)
 {
-	return table->bucket[__hash_index_transfomer(table, key)];
+	int index = __hash_index_transfomer(table, key);
+
+	while (table->keys[index] != NULL) {
+		index = (index + 1) % table->size;
+	}
+	
+	return table->bucket[index];
 }
 
 int 
