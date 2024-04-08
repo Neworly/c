@@ -59,7 +59,7 @@ hash_code(HashTable* table, char* const key)
 }
 
 void
-hash_push(HashTable* table, char* const key, void* value)
+hash_insert(HashTable* table, char* const key, void* value)
 {
 
 	unsigned width = table->width;
@@ -121,14 +121,14 @@ main(void)
 	int a = 2;
 	int b = 4;
 
-	hash_push(&table, "John", &a);
-	hash_push(&table, "John2", &a);
-	hash_push(&table, "John3", &b);
-	hash_push(&table, "John4", &b);
-	hash_push(&table, "o234234hn5", &b);
-	hash_push(&table, "o234234hn9", &b);
-	hash_push(&table, "o234234hn12", &b);
-	hash_push(&table, "o234234hn11", &b);
+	hash_insert(&table, "John", &a);
+	hash_insert(&table, "John2", &a);
+	hash_insert(&table, "John3", &b);
+	hash_insert(&table, "John4", &b);
+	hash_insert(&table, "o234234hn5", &b);
+	hash_insert(&table, "o234234hn9", &b);
+	hash_insert(&table, "o234234hn12", &b);
+	hash_insert(&table, "o234234hn11", &b);
 
 	printf("%i\n", *(int*) hash_look(&table, "John4"));
 
