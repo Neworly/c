@@ -118,7 +118,7 @@ void iter_mode (struct Metadata *iter, int flag)
         iter->mode = iter->mode | flag;
 }
 
-int __iter_update_mode (struct Metadata *iter)
+static int __iter_update_mode (struct Metadata *iter)
 {
         switch(iter->mode)
         {
