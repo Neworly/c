@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <pthread.h>
 
 enum SIGERR {
         OKAY,
@@ -14,6 +13,7 @@ enum SIGERR {
 
 enum ITMODES {
         IT_BTEND = 1,
+        IT_ETBASE = 2,
 };
 
 struct Metadata
@@ -25,8 +25,7 @@ struct Metadata
 
         void *data;
 
-        pthread_t id;
-        pthread_mutex_t key;
+        unsigned int status: 1;
 
         struct {
                 char *base;
@@ -92,18 +91,20 @@ void sigwarn (enum SIGERR sig)
 
 
 
-struct Metadata iter_create(char *p, size_t length)
+struct Metadata iter_create (char *p, size_t length)
 {
+
         struct Metadata iter = __iter_create(p, length);
         enum SIGRECV reterr = sigrecv(iter.sig);
         if (reterr != IGNORE)
                 sigwarn(iter.sig);
 
         iter.mode = 0;
+        iter.status = 0;
         return iter;
 }
 
-int iter_checkflag(struct Metadata *from, int flag)
+int iter_checkflag (struct Metadata *from, int flag)
 {
         if ((from->mode & flag) == flag) {
                 return 1;
@@ -112,13 +113,38 @@ int iter_checkflag(struct Metadata *from, int flag)
         return 0;
 }
 
-void iter_mode(struct Metadata *iter, int flag)
+void iter_mode (struct Metadata *iter, int flag)
 {
         if (iter_checkflag(iter, flag)) {
                 return;
         }
 
         iter->mode = iter->mode | flag;
+}
+
+int __iter_update_mode (struct Metadata *iter)
+{
+        switch(iter->mode)
+        {
+                case IT_BTEND: {
+                        iter->cursor.offset = iter->cursor.base;
+                        return 0;
+                }
+
+                case IT_ETBASE: {
+                        char *end = iter->cursor.end;
+                        iter->cursor.end = iter->cursor.base;
+                        iter->cursor.base = end;
+                        iter->cursor.offset = end;
+                        return 0;
+                }
+
+                default:
+                        fprintf(stdout, "this or mixture of flags aren't supported.");
+                        return -1;
+        }
+
+
 }
 
 void *iter_next(struct Metadata *iter)
@@ -129,33 +155,50 @@ void *iter_next(struct Metadata *iter)
         }
 
         if (iter->sig != OKAY) return NULL;
-        if ((iter->cursor.end - iter->cursor.offset) <= 0) return NULL;
+        if ((iter->cursor.end - iter->cursor.offset) == 0) return NULL;
 
-        iter->data = iter->cursor.offset;
-        iter->cursor.offset += 1;
+        switch(iter->mode)
+        {
+                case IT_BTEND:
+                        iter->data = iter->cursor.offset;
+                        iter->cursor.offset += 1;
+                        break;
+
+                case IT_ETBASE:
+                        iter->cursor.offset -= 1;
+                        iter->data = iter->cursor.offset;
+                        break;
+
+                default:
+                        fprintf(stdout, "this or mixture of flags aren't supported.");
+                        iter->cursor.offset = iter->cursor.base;
+                        iter->status = 0;
+                        iter->mode = 0;
+                        return NULL;
+        }
+
         return iter->data;
 }
 
-struct __tdatawrap
+/*struct __tdatawrap
 {
         struct Metadata *info;
         void *(*fn)(void *arg);
-};
+};*/
 
-static void *__iter_mapcall(void *arg)
+static void **__iter_mapcall(struct Metadata *iter, void* (*fmap)(void*))
 {
-
-        struct __tdatawrap *iterdata = arg;
+        if (iter->status) return NULL;
 
         void **retval = NULL;
         size_t index = 0;
 
-
         void *data = NULL;
 
-        pthread_mutex_lock(&iterdata->info->key);
-        while ((data = iter_next(iterdata->info)) != NULL) {
-                void* retfn = iterdata->fn(data);
+        iter->status = 1;
+
+        while ((data = iter_next(iter)) != NULL) {
+                void* retfn = fmap(data);
                 if (retfn == NULL) continue;
 
                 size_t size = index + 1;
@@ -163,45 +206,37 @@ static void *__iter_mapcall(void *arg)
                 retval[index++] = retfn;
         }
 
+        iter->status = 0;
         return retval;
 }
 
 
-// TODO: (Marling) threads might fail, alert the user in case that happens,
-// this implementation seems to be AS-Unsafe, handle signals accordingly.
-void *iter_mapcall(struct Metadata *iter, int flag, void *(*map)(void *))
+void **iter_mapcall(struct Metadata *iter, int flag, void *(*map)(void *))
 {
         iter->mode = (iter->mode & 0x0) | flag;
 
-        pthread_mutex_init(&iter->key, NULL);
-        pthread_create(&iter->id, NULL, __iter_mapcall, (void*) &(struct __tdatawrap) {
-                .info = iter,
-                .fn = map
-        });
+        if (__iter_update_mode(iter) == -1)
+                return NULL;
 
-
-        void **retval = NULL;
-
-        pthread_join(iter->id, retval);
-        pthread_mutex_unlock(&iter->key);
-        pthread_mutex_destroy(&iter->key);
-
-        return retval;
+        return __iter_mapcall(iter, map);
 }
+
 
 void *printeach_char(void *i)
 {
-        printf("%c", *(char*)i);
-        return NULL;
+        printf("%c\n", *(char*)i);
+        return "hello";
 }
+
+#define deref(data) *data
+#define deref_as(data, type) (type*) ((deref(data)))
 
 int main ()
 {
         char str[] = {'a', 'b', 'c', 'd'};
 
         struct Metadata iter = iter_create(str, sizeof(str));
-
-        iter_mapcall(&iter, IT_BTEND, printeach_char);
-
+        void **data = iter_mapcall(&iter, IT_BTEND, printeach_char);
+        printf("%p", *data);
         return 0;
 }
