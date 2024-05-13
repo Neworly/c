@@ -106,11 +106,7 @@ struct Metadata iter_create (char *p, size_t length)
 
 int iter_checkflag (struct Metadata *from, int flag)
 {
-        if ((from->mode & flag) == flag) {
-                return 1;
-        }
-
-        return 0;
+        return (from->mode & flag) == flag);
 }
 
 void iter_mode (struct Metadata *iter, int flag)
