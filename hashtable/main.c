@@ -157,14 +157,16 @@ void __display_bucket (struct Data *bucket)
         }
 }
 
+#define NEW_HASHTABLE(struct HashTable)                          \
+{                                                                \
+        ._bucket = construct_bucket(),                           \
+        .insert = push,                                          \
+        .search = get,                                           \
+}                                                                \
+
 int main (void)
 {
-        struct HashTable table = {
-                ._bucket = construct_bucket(),
-                .insert = push,
-                .search = get,
-
-        };
+        struct HashTable table = NEW_HASHTABLE;
 
 
         table.insert(&table._bucket, "Hello", "World!");
