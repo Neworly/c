@@ -1,138 +1,178 @@
-
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
+#include <stdint.h>
 
-typedef struct {
-	void** bucket;
-	char** keys;
-
-	unsigned width;
-	unsigned scale;
-
-	unsigned size;
-} HashTable;
-
-
-HashTable 
-new_hashmap(unsigned size, unsigned capacity)
+struct Data
 {
-	return (HashTable)
-	{
-		.bucket = NULL,
-		.keys = NULL,
-		.width = 0,
-		.scale = size,
-		.size = capacity,
-	};
+        struct Pair **values;
+
+
+        size_t _length;
+        size_t _capacity;
+};
+
+struct Pair
+{
+        char *k;
+        void *v;
+};
+
+struct HashTable
+{
+        struct Data _bucket;
+
+        void *(*insert)(struct Data*, char *const, void*);
+        void *(*search)(struct Data*, char *const);
+};
+
+#define TABLE_CAPACITY_OFFSET 2
+#define TABLE_BASE_CAPACITY 10
+#define TABLE_GROWTH_CAPACITY 12
+
+
+void *push (struct Data*, char*const, void*);
+void deconstruct_bucket (struct Data*);
+
+void rehash (struct Data *bucket)
+{
+        size_t length = bucket->_length, *capacity = &(bucket->_capacity);
+        size_t max = *capacity;
+
+        size_t lfactor = length / max;
+        if (length >= max
+                || lfactor*max == max
+                || length < (lfactor*max/4)
+        ) {
+                size_t oldcap = max;
+                *capacity += TABLE_GROWTH_CAPACITY;
+
+
+                struct Data *oldb = bucket;
+                struct Pair **oldv = oldb->values;
+
+                bucket->values = calloc(*capacity, sizeof(void*));
+                bucket->_length = 0;
+
+                for (size_t i = 0; i < oldcap; i++) {
+                        if (oldv[i] != NULL) {
+                                push(bucket, oldv[i]->k, oldv[i]->v);
+                        }
+                }
+
+                deconstruct_bucket (oldb);
+        }
 }
 
-
-unsigned
-__hash_index_transfomer(HashTable* table, char* const key)
+struct Data construct_bucket ()
 {
-	unsigned code = 0;
 
-	for (char* tracker = key; *tracker != '\0'; tracker++) 
-	{
-		code = code + (*tracker);
-	}
-	
-	return code % table->size;
+        struct Data it = { ._length = 0, ._capacity = TABLE_BASE_CAPACITY };
+
+        if (!(it.values = calloc(TABLE_BASE_CAPACITY, sizeof(struct Pair*)))) exit(0);
+
+        return it;
 }
 
-int
-hash_code(HashTable* table, char* const key)
+void deconstruct_bucket (struct Data *bucket)
 {
+        for (size_t i = 0; i < bucket->_capacity; i++) {
+                if (bucket->values[i]) free(bucket->values[i]);
+        }
 
-	int index = __hash_index_transfomer(table, key);
-
-	char** ptr = table->keys;
-
-	for (int at = 0; at < table->size; (at++, ptr++)) {
-		if (((*ptr != NULL)) && (strcmp(table->keys[at], key) == 0)) {
-			return -1;
-		}
-	}
-
-	return index; 
+        free(bucket->values);
 }
 
-void
-hash_insert(HashTable* table, char* const key, void* value)
+size_t collide (size_t hashc, struct Data *bucket)
 {
+        size_t loffset = 1, roffset = 1;
 
-	unsigned width = table->width;
-	unsigned scale = table->scale;
-	unsigned psize = table->size;
+        while (bucket->values[hashc]) {
+                size_t l = (hashc - loffset) % bucket->_capacity, r = (hashc + roffset) % bucket->_capacity;
 
-	if (width == table->size) {
-		table->size += 1;
-	}
+                if (!bucket->values[l]) {
+                        hashc = l;
+                        break;
+                } else if (!bucket->values[r]) {
+                        hashc = r;
+                        break;
+                }
 
-	unsigned size = table->size;
+                (loffset += loffset + 1, roffset += 1);
+        }
 
-	if (width == 0 || width == psize) {
-		table->bucket = realloc(table->bucket, size * sizeof(void*));
-		table->keys = realloc(table->keys, size * sizeof(void*));
-	}
-
-	void** bucket = table->bucket;
-	char** keys = table->keys;
-
-	int index = __hash_index_transfomer(table, key);
-	if (hash_code(table, key) == -1) {
-		return;
-	}
-	
-	while (keys[index] != NULL) {
-		index = (index + 1) % table->size;
-	}
-
-	bucket[index] = realloc(table->bucket[index], scale);
-	keys[index] = realloc(table->keys[index], strlen(key));
-	bucket[index] = value;
-	table->width += 1;
-	strcpy(keys[index], key);
-}	
-
-
-void*
-hash_look(HashTable* table, char* const key)
-{
-	if (hash_code(table, key) != -1) {
-		return NULL;
-	}
-	 
-	unsigned index = __hash_index_transfomer(table, key);
-	while (strcmp(table->keys[index], key) != 0) {
-		index = (index + 1) % table->size;
-	}
-
-	return table->bucket[index];
+        return hashc;
 }
 
-int 
-main(void)
+size_t bytestrton (char *str)
 {
+        size_t size = 0;
+        for (char x = *str; x; (x = *(++str))) {
+                size += x;
+        }
 
-	HashTable table = new_hashmap(sizeof(int), 10);
+        return size;
+}
 
-	int a = 2;
-	int b = 4;
+size_t hashf (char *key, struct Data *bucket)
+{
+        return bytestrton(key) % bucket->_capacity;
+}
 
-	hash_insert(&table, "John", &a);
-	hash_insert(&table, "John2", &a);
-	hash_insert(&table, "John3", &b);
-	hash_insert(&table, "John4", &b);
-	hash_insert(&table, "o234234hn5", &b);
-	hash_insert(&table, "o234234hn9", &b);
-	hash_insert(&table, "o234234hn12", &b);
-	hash_insert(&table, "o234234hn11", &b);
+void *push (struct Data *bucket, char *const key, void *value)
+{
+        size_t hashcode = collide(hashf(key, bucket), bucket);
 
-	printf("%i\n", *(int*) hash_look(&table, "John4"));
+        struct Pair **this = &(*((bucket->values) + hashcode));
+        *this = malloc(sizeof(struct Pair));
+        ((*this)->k = key, (*this)->v = value);
+
+        bucket->_length += 1;
+        rehash(bucket);
+
+        return NULL;
+}
+
+void *get (struct Data *bucket, char *const key)
+{
+        size_t hashcode = hashf(key, bucket);
+        for (;;) {
+                if (bucket->values[hashcode] && bytestrton((*(bucket->values + hashcode))->k) == bytestrton(key)) {
+                        return (*(bucket->values + hashcode))->v;
+                }
+                hashcode = (hashcode + 1) % bucket->_capacity;
+        }
+
+        return NULL;
+}
+
+void __display_bucket (struct Data *bucket)
+{
+        size_t capacity = bucket->_capacity;
+        size_t length = bucket->_length;
+
+        puts("");
+        for (size_t i = 0; i < capacity; i++)
+        {
+                printf("[%zu] -> %p\n", i, bucket->values[i]);
+        }
+}
+
+int main (void)
+{
+        struct HashTable table = {
+                ._bucket = construct_bucket(),
+                .insert = push,
+                .search = get,
+
+        };
 
 
+        table.insert(&table._bucket, "Hello", "World!");
 
-	return EXIT_SUCCESS;
+        __display_bucket(&table._bucket);
+
+
+        printf("%s", (char*) table.search(&table._bucket, "Hello"));
+
+        return 0;
 }
