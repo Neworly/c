@@ -157,7 +157,7 @@ void __display_bucket (struct Data *bucket)
         }
 }
 
-#define NEW_HASHTABLE(struct HashTable)                          \
+#define NEW_HASHTABLE (struct HashTable)                         \
 {                                                                \
         ._bucket = construct_bucket(),                           \
         .insert = push,                                          \
